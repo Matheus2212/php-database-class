@@ -102,9 +102,6 @@ class db
             $key = md5($mixed);
             if (!array_key_exists($key, self::$object)) {
                 $instance = self::getInstance();
-                echo "<pre>";
-                echo $mixed;
-                echo "</pre>";
                 $object = new dbObject($instance->query($mixed), array("key" => $key));
                 self::$object[$key] = $object;
             }
@@ -132,10 +129,6 @@ class db
                 $mixed->extra['rows'] = 0;
             }
             $mixed->extra['rows']++;
-            if ($mixed->extra['rows'] == $mixed->extra['totalEntries']) {
-                unset(self::$object[$mixed->extra['key']]);
-                return false;
-            }
             return $mixed->getInstance()->fetch(PDO::FETCH_ASSOC);
         }
         if ($mixed instanceof dbObject) {
@@ -325,7 +318,6 @@ class db
                     $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "?" . http_build_query($_GET), $words["prev"], '', ''), $htmlButton);
                 }
             }
-            $contador = 0;
             $pageCount = 0;
             while ($pageCount <= $totalPages) {
                 $pageCount++;
@@ -551,7 +543,7 @@ class db
                 $newRules[] = $key . "=:" . "rule_" . $key;
             };
         }
-        $sql = "DELETE FROM $table " . (empty($rules) ? "" : "WHERE " . implode(" AND ", $newRules)) . ";";
+        $sql = "DELETE FROM $table " . (empty($newRules) ? "" : "WHERE " . implode(" AND ", $newRules)) . ";";
         $object = self::getInstance();
         $stmnt = self::prepare($object, $sql);
         if (!empty($rules)) {
