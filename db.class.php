@@ -2,18 +2,42 @@
 
 /**
  * PHP DB Class
+ * 2021-01-07 -> Class created
+ * 2021-03-12 -> Added rel="canoical|prev|next" to <a> pagination tags
+ * 2021-03-12 -> Added a lot of comments
+ * 
+ * MUST FIX: delete(), $rules inside insert, define $functions on update and insert
+ * 
+ * MUST CREATE: search method, wordlist method, similarwords method, searchSimilarWord method
  */
 
 class db
 {
+    /** This stores the current $connectionName */
     protected static $connectionName = null;
+
+    /** This array stores all $connections added so far on execution */
     protected static $connections = array();
+
+    /** This will receive the last inserted row $id */
     protected static $id = null;
+
+    /** This is an array with the objects keys. */
     protected static $object = array();
+
+    /** It is the $pagedObject. It is set by pagedQuery method */
     protected static $pageObject = null;
+
+    /** It will receive a $friendURL instance to work with friendly URLs */
     protected static $friendlyURL = false;
+
+    /** It will receive the time() when the class has first executed anything */
     private static $dbInit = null;
+
+    /** This is the default class $language */
     protected static $language = "en";
+
+    /** These are the words that pagination may have */
     protected static $defaultPaginationWords = array(
         "en" => array(
             "class" => "pagination",
@@ -29,6 +53,7 @@ class db
         )
     );
 
+    /** Will return a database instance. It also sets manny vars about the connection, if isn't yet defined */
     public static function getInstance()
     {
         if (self::$dbInit == null) {
@@ -62,6 +87,7 @@ class db
         }
     }
 
+    /** Adds a database connection */
     public static function addConnection($connectionName, $connectionCredentials)
     {
         if (!array_key_exists($connectionName, self::$connections)) {
@@ -70,6 +96,7 @@ class db
         }
     }
 
+    /** Defines which connection the class will use */
     public static function useConnection($connectionName)
     {
         if (array_key_exists($connectionName, self::$connections)) {
@@ -78,6 +105,7 @@ class db
         }
     }
 
+    /** Sets total amount of requests to +1 */
     private static function updateTotalRequests()
     {
         if (!isset(self::$connections[self::$connectionName]['totalRequests'])) {
@@ -86,16 +114,19 @@ class db
         self::$connections[self::$connectionName]['totalRequests']++;
     }
 
+    /** Returns the total amount of requests that the class did so far */
     public static function getTotalRequests()
     {
         return (isset(self::$connections[self::$connectionName]['totalRequests']) ? self::$connections[self::$connectionName]['totalRequests'] : 0);
     }
 
+    /** Checks the server speed */
     public static function performance()
     {
         echo "<!-- Time ellapsed: " . ((int) microtime() - (int) self::$dbInit) . " -->";
     }
 
+    /** Creates a new DB Object with the given PDO instance */
     private static function encapsulate($mixed)
     {
         if (is_string($mixed)) {
@@ -116,6 +147,7 @@ class db
         }
     }
 
+    /** Returns a single row */
     public static function fetch($mixed, $simple = false)
     {
         if (is_string($mixed)) {
@@ -139,6 +171,7 @@ class db
         }
     }
 
+    /** Returns all fetched data */
     public static function fetchAll($mixed)
     {
         $mixed = self::encapsulate($mixed);
@@ -154,12 +187,14 @@ class db
         }
     }
 
+    /** It counts the total rows that $mixed have */
     public static function count($mixed)
     {
         $object = self::encapsulate($mixed);
         return $object->extra['totalEntries'];
     }
 
+    /** Checks if the given $query returns null. If it returns null or 0, the function return true (is empty) */
     public static function empty($query)
     {
         if (is_string($query)) {
@@ -171,11 +206,13 @@ class db
         }
     }
 
+    /** Simple query */
     public static function query($mixed)
     {
         return self::encapsulate($mixed);
     }
 
+    /** This is a paged query */
     public static function pagedQuery($mixed, $limit, $page = false, $words = false)
     {
         if (is_string($mixed)) {
@@ -218,12 +255,14 @@ class db
         }
     }
 
+    /** It sets the class $language */
     public static function setLanguage($language)
     {
         self::$language = $language;
         return new static();
     }
 
+    /** It defines the words that the pagination HTML will have */
     public static function setPaginationWords($object, $words = false)
     {
         try {
@@ -243,6 +282,7 @@ class db
         }
     }
 
+    /** It retrieves the current page */
     private static function getPageNow($object = false)
     {
         if (!$object) {
@@ -274,6 +314,7 @@ class db
         return $pageNow;
     }
 
+    /** It creates the pagination HTML */
     public static function page($echo = true, $class = "")
     {
         $totalRows = self::$pageObject->extra['totalEntries'];
@@ -307,15 +348,15 @@ class db
                 }
             }
             $htmlWrapper = "<ul class='pagination {additional}'>{buttons}</ul>";
-            $htmlButton = "<li {disabled}><a class='" . $words['class'] . " {active}' href='{target}'>{text|number}</a></li>";
+            $htmlButton = "<li {disabled}><a {rel} class='" . $words['class'] . " {active}' href='{target}'>{text|number}</a></li>";
             $buttons = array();
             if ($pageNow > 1) {
                 if (self::$friendlyURL) {
                     $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow - 1);
-                    $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "/" . implode("/", $parts), $words["prev"], '', ''), $htmlButton);
+                    $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='prev'", $url . "/" . implode("/", $parts), $words["prev"], '', ''), $htmlButton);
                 } else {
                     $_GET[$words['url']] = $pageNow - 1;
-                    $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "?" . http_build_query($_GET), $words["prev"], '', ''), $htmlButton);
+                    $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='prev'", $url . "?" . http_build_query($_GET), $words["prev"], '', ''), $htmlButton);
                 }
             }
             $pageCount = 0;
@@ -324,28 +365,28 @@ class db
                 if ($pageCount == $pageNow) {
                     if (self::$friendlyURL) {
                         $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow);
-                        $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array("javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
+                        $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", "javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
                     } else {
                         $_GET[$words['url']] = $pageNow;
-                        $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array("javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
+                        $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", "javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
                     }
                 } else {
                     if ($pageCount <= $pageNow && ($pageCount >= $pageNow - 4 && ($pageNow == $totalPages || $pageNow + 1 == $totalPages || $pageNow + 2 == $totalPages) || ($pageCount >= $pageNow - 2)) && $pageCount > 0 && count($buttons) < 5 && ($pageCount == $pageNow - 1 || $pageCount == $pageNow - 2 || count($buttons) <= 5)) {
                         if (self::$friendlyURL) {
                             $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageCount);
-                            $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
+                            $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
                         } else {
                             $_GET[$words['url']] = $pageCount;
-                            $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "?" . http_build_query($_GET), $pageCount, '', ''), $htmlButton);
+                            $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "?" . http_build_query($_GET), $pageCount, '', ''), $htmlButton);
                         }
                     }
                     if ($pageCount >= $pageNow && $pageCount <= $totalPages && count($buttons) <= 5 && ($pageCount == $pageNow + 1 || $pageCount == $pageNow + 2 ||  count($buttons) <= 5)) {
                         if (self::$friendlyURL) {
                             $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageCount);
-                            $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
+                            $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
                         } else {
                             $_GET[$words['url']] = $pageCount;
-                            $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "?" . http_build_query($_GET), $pageCount, '', ''), $htmlButton);
+                            $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "?" . http_build_query($_GET), $pageCount, '', ''), $htmlButton);
                         }
                     }
                 }
@@ -353,10 +394,10 @@ class db
             if ($pageNow < $totalPages) {
                 if (self::$friendlyURL) {
                     $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow + 1);
-                    $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "/" . implode("/", $parts), $words["next"], '', ''), $htmlButton);
+                    $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='next'", $url . "/" . implode("/", $parts), $words["next"], '', ''), $htmlButton);
                 } else {
                     $_GET[$words['url']] = $pageNow + 1;
-                    $buttons[] = str_replace(array("{target}", '{text|number}', '{active}', '{disabled}'), array($url . "?" . http_build_query($_GET), $words["next"], '', ''), $htmlButton);
+                    $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='next'", $url . "?" . http_build_query($_GET), $words["next"], '', ''), $htmlButton);
                 }
             }
             if ($echo) {
@@ -367,16 +408,19 @@ class db
         }
     }
 
+    /** Returns server date */
     public static function date($time = false)
     {
         return ($time ? date("Y-m-d", $time) : date("Y-m-d"));
     }
 
+    /** Returns server dateTime */
     public static function dateTime($time = false)
     {
         return ($time ? date("Y-m-d H:s:i", $time) : date("Y-m-d H:s:i"));
     }
 
+    /** It will change the whole database $collation */
     public static function setCollation($collation, $show = false, $execute = false)
     {
         $db_nome = self::$connections[self::$connectionName]['NAME'];
@@ -403,17 +447,20 @@ class db
         }
     }
 
+    /** Will define the $friendlyURL instance on the class */
     public static function setFriendlyURL($FriendlyURLInstance)
     {
         self::$friendlyURL = $FriendlyURLInstance;
         return new static();
     }
 
+    /** It will retrieve the collumns of the given $table */
     private static function getTableCollumns($table)
     {
         return self::fetchAll(self::query("DESCRIBE $table"));
     }
 
+    /** It will fix invalid $data keys before insert them on the $table. It removes not used keys inside $data, and bind a empty string if a specific $key that exists on the table, doesn't exist on $data */
     private static function fixDataCollumns($data, $table, &$newData = array(), $mode = "insert")
     {
         $collumns = self::getTableCollumns($table);
@@ -465,21 +512,25 @@ class db
         return $newData;
     }
 
+    /** It will prepare a given $sql to the given $object */
     public static function prepare($object, $sql)
     {
         return $object->prepare($sql);
     }
 
+    /** It will set the given $value on the specific $key, inside the $object. Object is a PDO Statement */
     public static function set(&$object, $key, $value)
     {
         $object->bindValue(":" . $key, $value);
     }
 
+    /** It executes any given $sql */
     public static function execute($sql)
     {
         return self::getInstance()->exec($sql);
     }
 
+    /** WORK IN PROGRESS - It will insert $data on a specific $table. The $rules are optional */
     public static function insert($data, $table, $rules = array())
     {
         self::fixDataCollumns($data, $table, $newData);
@@ -498,11 +549,13 @@ class db
         }
     }
 
+    /** It will return the id of the last inserted row */
     public static function id()
     {
         return self::$id;
     }
 
+    /** It will update a row on a specific $table with new $data. The row must attend to the $rules */
     public static function update($data, $table, $rules = array())
     {
         self::fixDataCollumns($data, $table, $newData, "update");
@@ -535,6 +588,7 @@ class db
         }
     }
 
+    /** WORK IN PROGRESS - It will delete a record - or all - on a specific $table */
     public static function delete($table, $rules = array())
     {
         if (!empty($rules)) {
@@ -558,6 +612,7 @@ class db
         }
     }
 
+    /** It will normalize a string to be accepted on URL addresses */
     public function URLNormalize($string)
     {
         $string = preg_replace('/[áàãâä]/ui', 'a', $string);
@@ -572,11 +627,16 @@ class db
     }
 }
 
+/** DB Object class - it will store the result of the request */
 class dbObject
 {
+    /** It is the DB instance */
     protected static $instance = null;
+
+    /** Array with extra info */
     public $extra = null;
 
+    /** It already sets a number of info on $extra */
     public function __construct($instance, $extra = array())
     {
         $this->setInstance($instance);
@@ -584,10 +644,14 @@ class dbObject
         $this->extra['totalEntries'] = $instance->rowCount();
         return $this;
     }
+
+    /** It will set the $instance */
     private static function setInstance($instance)
     {
         self::$instance = $instance;
     }
+
+    /** It will retrieve the object's DB $instance */
     public static function getInstance()
     {
         return self::$instance;
