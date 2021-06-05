@@ -3,10 +3,10 @@
 /**
  * PHP DB Class
  * 2021-01-07 -> Class created
- * 2021-03-12 -> Added rel="canoical|prev|next" to <a> pagination tags
+ * 2021-03-12 -> Added rel="canonical|prev|next" to <a> pagination tags
  * 2021-03-12 -> Added a lot of comments
+ * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage
  * 
- * MUST FIX: delete(), $rules inside insert, define $functions on update and insert
  * 
  * MUST CREATE: search method, wordlist method, similarwords method, searchSimilarWord method
  */
@@ -54,7 +54,7 @@ class db
     );
 
     /** Will return a database instance. It also sets manny vars about the connection, if isn't yet defined */
-    public static function getInstance()
+    private static function getInstance()
     {
         if (self::$dbInit == null) {
             self::$dbInit = microtime();
@@ -220,7 +220,7 @@ class db
             $object->extra['limit'] = $limit;
             self::setPaginationWords($object, $words);
             if ($page == false) {
-                $page = self::getPageNow();
+                $page = self::getCurrentPage();
             }
             $newObject = self::query($mixed . " LIMIT " . (($limit * $page) - $limit) . ", " . $limit);
             return $newObject;
@@ -229,7 +229,7 @@ class db
             $totalRows = $mixed->extra['totalEntries'];
             $object = new dbObject($mixed->getInstance(), array("limit" => $limit, 'totalEntries' => $totalRows));
             self::setPaginationWords($object, $words);
-            $page = self::getPageNow();
+            $page = self::getCurrentPage();
             if ($totalRows > $limit) {
                 $newObject = self::query($mixed->getInstance()->queryString . " LIMIT " . (($limit * $page) - $limit) . ", " . $limit);
                 return $newObject;
@@ -244,7 +244,7 @@ class db
             self::updateTotalRequests();
             $object =  new dbObject($mixed, array("limit" => $limit));
             self::setPaginationWords($object, $words);
-            $page = self::getPageNow();
+            $page = self::getCurrentPage();
             if ($totalRows > $limit) {
                 $newObject = self::query($mixed->queryString . " LIMIT " . (($limit * $page) - $limit) . ", " . $limit);
                 return $newObject;
@@ -283,7 +283,7 @@ class db
     }
 
     /** It retrieves the current page */
-    private static function getPageNow($object = false)
+    private static function getCurrentPage($object = false)
     {
         if (!$object) {
             $object = self::$pageObject;
@@ -327,7 +327,7 @@ class db
             }
             $words = self::$pageObject->extra['words'];
             $totalPages = ceil($totalRows / $limit);
-            $pageNow = self::getPageNow(self::$pageObject);
+            $pageNow = self::getCurrentPage(self::$pageObject);
             if ($class) {
                 $words['class'] . " " . $class . " ";
             }
@@ -530,19 +530,47 @@ class db
         return self::getInstance()->exec($sql);
     }
 
-    /** WORK IN PROGRESS - It will insert $data on a specific $table. The $rules are optional */
-    public static function insert($data, $table, $rules = array())
+    /** It will apply the additional steps before the real method applyment */
+    private static function transformWith(&$data, $additional)
+    {
+        if (isset($additional['function'])) {
+            foreach ($additional['function'] as $fieldKey => $function) {
+                if (isset($data[$fieldKey])) {
+                    $data[$fieldKey] = call_user_func($function, $data[$fieldKey]);
+                }
+            }
+        }
+    }
+
+    /** This function is responsible to make the given value a decimal value for monetary operations */
+    /** It looks like the best option to save monney on a database is to use the DECIMAL 19,4 */
+    public static function formatMonney($value)
+    {
+        $source = array('.', ',');
+        $replace = array('', '.');
+        $value = str_replace($source, $replace, $value);
+        return $value;
+    }
+
+
+    /** It will insert $data on a specific $table. The $rules are optional */
+    public static function insert($data, $table, $additional = array())
     {
         self::fixDataCollumns($data, $table, $newData);
-        $sql = "INSERT INTO $table (" . implode(", ", array_keys($newData)) . ") VALUES (:" . implode(", :", array_keys($newData)) . ");";
+        $array_keys = array_keys($newData);
+        $sql = "INSERT INTO $table (" . implode(", ", $array_keys) . ") VALUES (:" . implode(", :", $array_keys) . ");";
         $object = self::getInstance();
         $stmnt = self::prepare($object, $sql);
+        if (!empty($additional)) {
+            self::transformWith($newData, $additional);
+        }
         foreach ($newData as $key => $value) {
             self::set($stmnt, $key, $value);
         }
         if ($stmnt->execute()) {
             self::updateTotalRequests();
             self::$id = $object->lastInsertId();
+            unset($stmnt, $object);
             return true;
         } else {
             return false;
@@ -556,7 +584,7 @@ class db
     }
 
     /** It will update a row on a specific $table with new $data. The row must attend to the $rules */
-    public static function update($data, $table, $rules = array())
+    public static function update($data, $table, $rules = array(), $additional = array())
     {
         self::fixDataCollumns($data, $table, $newData, "update");
         $collumns = array();
@@ -572,6 +600,9 @@ class db
         $sql = "UPDATE $table SET " . implode(", ", $collumns) . (!empty($rules) ? " WHERE " . implode(" AND ", $newRules) : "") . ";";
         $object = self::getInstance();
         $stmnt = self::prepare($object, $sql);
+        if (!empty($additional)) {
+            self::transformWith($newData, $additional);
+        }
         foreach ($newData as $key => $value) {
             self::set($stmnt, $key, $value);
         }
@@ -588,7 +619,7 @@ class db
         }
     }
 
-    /** WORK IN PROGRESS - It will delete a record - or all - on a specific $table */
+    /** It will delete a record - or all - on a specific $table */
     public static function delete($table, $rules = array())
     {
         if (!empty($rules)) {
