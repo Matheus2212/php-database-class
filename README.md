@@ -6,6 +6,10 @@ It's the result of quite some time of studying the PDO class and the new PHP 7.4
 
 Let's go for the methods.
 
+
+---
+
+
 ### addConnection
 
 Method to define a database connection
