@@ -109,3 +109,7 @@ Will delete whole table if $rules is omitted
 ## URLNormalize
 
 Makes given string url friendly
+
+## search
+
+Simple search engine. It uses the content inside database (so, if database doesn't have much records...)

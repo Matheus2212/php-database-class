@@ -5,10 +5,8 @@
  * 2021-01-07 -> Class created
  * 2021-03-12 -> Added rel="canonical|prev|next" to <a> pagination tags
  * 2021-03-12 -> Added a lot of comments
- * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage
+ * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage. Added search method.
  * 
- * 
- * MUST CREATE: search method, wordlist method, similarwords method, searchSimilarWord method
  */
 
 class db
@@ -36,6 +34,9 @@ class db
 
     /** This is the default class $language */
     protected static $language = "en";
+
+    /** This is the max number of words given a list of words on search method */
+    protected static $wordLimit = 25;
 
     /** These are the words that pagination may have */
     protected static $defaultPaginationWords = array(
@@ -641,6 +642,57 @@ class db
         } else {
             return false;
         }
+    }
+
+    /** Will return an array with all words inside the given input */
+    private static function getAllWords($input)
+    {
+        $words = array_filter(explode(" ", $input), function ($word) {
+            if (strlen($word) > 3) {
+                return $word;
+            }
+        });
+        sort($words);
+        $allcombinations = array();
+        $total = count($words);
+        foreach ($words as $word) {
+            for ($iterate = 0; $iterate < $total; $iterate++) {
+                if ($words[$iterate] !== $word) {
+                    $wordNow = $word . " " . $words[$iterate];
+                    if (!in_array($wordNow, $allcombinations)) {
+                        $allcombinations[] = $wordNow;
+                    }
+                } else {
+                    $allcombinations[] = $word;
+                }
+            }
+            if (count($allcombinations) == self::$wordLimit) {
+                break;
+            }
+        }
+        function csort($a, $b)
+        {
+            return strlen($b) - strlen($a);
+        }
+        usort($allcombinations, 'csort');
+        echo "<pre>";
+        print_r($allcombinations);
+        echo "</pre>";
+        return $allcombinations;
+    }
+
+    /** It will search for the given input inside the given table and return all records found */
+    public static function search($what, $where)
+    {
+        $words = self::getAllWords($what);
+        $collumns = array();
+        foreach (self::getTableCollumns($where) as $key => $field) {
+            $collumns[] = $field['Field'];
+        }
+        $concat = "CONCAT(" . implode(", ", $collumns) . ")";
+        $sql = "SELECT * FROM $where WHERE $concat LIKE ('%" . implode("%') OR $concat LIKE ('%", $words) . "%')";
+        $query = self::query($sql);
+        return $query;;
     }
 
     /** It will normalize a string to be accepted on URL addresses */

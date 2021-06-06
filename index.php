@@ -4,4 +4,10 @@ include("db.class.php");
 
 db::addConnection('default', array("HOST" => "localhost", "USER" => "root", "PASSWORD" => "", "NAME" => "test"));
 
-db::insert(array("monney" => "1,00.50"), "monney");
+$resultado = db::search("teste comum verdadeiro falso com amor", "emails");
+
+while ($dado = db::fetch($resultado)) {
+        echo "<pre>";
+        print_r($dado);
+        echo "</pre>";
+}
