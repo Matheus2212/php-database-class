@@ -6,110 +6,110 @@ It's the result of quite some time of studying the PDO class and the new PHP 7.4
 
 Let's go for the methods.
 
-## addConnection
+### addConnection
 
 Method to define a database connection
 
-## useConnection
+### useConnection
 
 This function will set which connection the class should use at the moment
 
-## getTotalRequests
+### getTotalRequests
 
 It will return the total amount number of requests that were done to the database
 
-## performance
+### performance
 
 It will display a HTML comment on the page, displaying the total amount of time in unix the requisitions had taken
 
-## fetch
+### fetch
 
 Will fetch a row. If $simple then only one row and finishes.
 
-## fetchAll
+### fetchAll
 
 Will give all results
 
-## count
+### count
 
 Will give the number of rows inside the object
 
-## empty
+### empty
 
 If the object is empty, returns true
 
-## query
+### query
 
 Performns a query
 
-## pagedQuery
+### pagedQuery
 
 Breaks the number of results to be shown in a smallest number
 
-## setLanguage
+### setLanguage
 
 Define which language the class should work (default: english)
 
-## setPaginationWords
+### setPaginationWords
 
 Defines the words inside the pagination HTML when the page method is evoked
 
-## getCurrentPage
+### getCurrentPage
 
 Will return the current page according to URL
 
-## page
+### page
 
 Will give the pagination HTML
 
-## date
+### date
 
 Will give server date
 
-## datetime
+### datetime
 
 Will give server datetime
 
-## setCollation
+### setCollation
 
 Will generate a SQL to change whole database collation. Returns a string, and can apply it too.
 
-## setFriendlyURL
+### setFriendlyURL
 
 Will stablish the FriendlyURL instance
 
-## prepare
+### prepare
 
 Will prepare a SQL
 
-## set
+### set
 
 Will bind value to a prepared SQL
 
-## formatMonney
+### formatMonney
 
 Will make the value a monetary one
 
-## insert
+### insert
 
 Will insert $data inside $table. If $additional is given, will transform values
 
-## id
+### id
 
 Returns last inserted id
 
-## update
+### update
 
 Updates $data in $table using given $rules. $additional is supported too.
 
-## delete
+### delete
 
 Will delete whole table if $rules is omitted
 
-## URLNormalize
+### URLNormalize
 
 Makes given string url friendly
 
-## search
+### search
 
 Simple search engine. It uses the content inside database (so, if database doesn't have much records...)
