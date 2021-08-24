@@ -6,7 +6,7 @@
  * 2021-03-12 -> Added rel="canonical|prev|next" to <a> pagination tags
  * 2021-03-12 -> Added a lot of comments
  * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage. Added search method.
- * 
+ * 2021-08-17 -> Made a few improvements within base core functions
  */
 
 class db
@@ -73,12 +73,12 @@ class db
             self::useConnection($connectionName);
         }
         try {
-            $connection = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";charset=utf8;", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
-            if ($connection) {
-                $connection->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+            $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";charset=utf8;", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
+            if ($instance) {
+                $instance->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
                 //$connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 self::updateTotalRequests();
-                return $connection;
+                return $instance;
             } else {
                 return false;
             }
@@ -93,7 +93,7 @@ class db
     {
         if (!array_key_exists($connectionName, self::$connections)) {
             self::$connections[$connectionName] = $connectionCredentials;
-            return new static();
+            return new static(new stdClass);
         }
     }
 
@@ -102,7 +102,7 @@ class db
     {
         if (array_key_exists($connectionName, self::$connections)) {
             self::$connectionName = $connectionName;
-            return new static();
+            return new static(new stdClass);
         }
     }
 
@@ -133,9 +133,12 @@ class db
         if (is_string($mixed)) {
             $key = md5($mixed);
             if (!array_key_exists($key, self::$object)) {
-                $instance = self::getInstance();
-                $object = new dbObject($instance->query($mixed), array("key" => $key));
-                self::$object[$key] = $object;
+                $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key));
+                self::$object[$key] = $instance;
+            }
+            if (self::$object[$key]->extra["rows"] === self::$object[$key]->extra["totalEntries"]) {
+                unset(self::$object[$key]);
+                return false;
             }
             return self::$object[$key];
         }
@@ -158,14 +161,10 @@ class db
                 }
             }
             $mixed = self::encapsulate($mixed);
-            if (!isset($mixed->extra['rows'])) {
-                $mixed->extra['rows'] = 0;
-            }
-            $mixed->extra['rows']++;
-            return $mixed->getInstance()->fetch(PDO::FETCH_ASSOC);
+            return ($mixed ? $mixed->getData() : $mixed);
         }
         if ($mixed instanceof dbObject) {
-            return $mixed->getInstance()->fetch(PDO::FETCH_ASSOC);
+            return $mixed->getData();
         }
         if ($mixed instanceof PDOStatement) {
             return $mixed->fetch(PDO::FETCH_ASSOC);
@@ -176,12 +175,8 @@ class db
     public static function fetchAll($mixed)
     {
         $mixed = self::encapsulate($mixed);
-        if (is_string($mixed)) {
-            $mixed = self::encapsulate($mixed);
-            return $mixed->getInstance()->fetchAll(PDO::FETCH_ASSOC);
-        }
         if ($mixed instanceof dbObject) {
-            return $mixed->getInstance()->fetchAll(PDO::FETCH_ASSOC);
+            return $mixed ? $mixed->getdata(1) : $mixed;
         }
         if ($mixed instanceof PDOStatement) {
             return $mixed->fetchAll(PDO::FETCH_ASSOC);
@@ -191,16 +186,14 @@ class db
     /** It counts the total rows that $mixed have */
     public static function count($mixed)
     {
-        $object = self::encapsulate($mixed);
-        return $object->extra['totalEntries'];
+        return self::encapsulate($mixed)->extra['totalEntries'];
     }
 
     /** Checks if the given $query returns null. If it returns null or 0, the function return true (is empty) */
     public static function empty($query)
     {
         if (is_string($query)) {
-            $object = self::query($query);
-            return ($object->getInstance()->rowCount() == 0);
+            return (self::query($query)->getInstance()->rowCount() == 0);
         }
         if ($query instanceof dbObject) {
             return ($query->getInstance()->rowCount() == 1);
@@ -217,9 +210,9 @@ class db
     public static function pagedQuery($mixed, $limit, $page = false, $words = false)
     {
         if (is_string($mixed)) {
-            $object = self::query($mixed);
-            $object->extra['limit'] = $limit;
-            self::setPaginationWords($object, $words);
+            $instance = self::query($mixed);
+            $instance->extra['limit'] = $limit;
+            self::setPaginationWords($instance, $words);
             if ($page == false) {
                 $page = self::getCurrentPage();
             }
@@ -228,8 +221,8 @@ class db
         }
         if ($mixed instanceof dbObject) {
             $totalRows = $mixed->extra['totalEntries'];
-            $object = new dbObject($mixed->getInstance(), array("limit" => $limit, 'totalEntries' => $totalRows));
-            self::setPaginationWords($object, $words);
+            $instance = new dbObject($mixed->getInstance(), array("limit" => $limit, 'totalEntries' => $totalRows));
+            self::setPaginationWords($instance, $words);
             $page = self::getCurrentPage();
             if ($totalRows > $limit) {
                 $newObject = self::query($mixed->getInstance()->queryString . " LIMIT " . (($limit * $page) - $limit) . ", " . $limit);
@@ -260,7 +253,7 @@ class db
     public static function setLanguage($language)
     {
         self::$language = $language;
-        return new static();
+        return new static(new stdClass);
     }
 
     /** It defines the words that the pagination HTML will have */
@@ -366,11 +359,10 @@ class db
                 if ($pageCount == $pageNow) {
                     if (self::$friendlyURL) {
                         $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow);
-                        $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", "javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
                     } else {
                         $_GET[$words['url']] = $pageNow;
-                        $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", "javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
                     }
+                    $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", "javascript:void(0)", $pageNow, 'active', 'disabled'), $htmlButton);
                 } else {
                     if ($pageCount <= $pageNow && ($pageCount >= $pageNow - 4 && ($pageNow == $totalPages || $pageNow + 1 == $totalPages || $pageNow + 2 == $totalPages) || ($pageCount >= $pageNow - 2)) && $pageCount > 0 && count($buttons) < 5 && ($pageCount == $pageNow - 1 || $pageCount == $pageNow - 2 || count($buttons) <= 5)) {
                         if (self::$friendlyURL) {
@@ -452,7 +444,7 @@ class db
     public static function setFriendlyURL($FriendlyURLInstance)
     {
         self::$friendlyURL = $FriendlyURLInstance;
-        return new static();
+        return new static(new stdClass);
     }
 
     /** It will retrieve the collumns of the given $table */
@@ -514,15 +506,15 @@ class db
     }
 
     /** It will prepare a given $sql to the given $object */
-    public static function prepare($object, $sql)
+    public static function prepare($instance, $sql)
     {
-        return $object->prepare($sql);
+        return $instance->prepare($sql);
     }
 
     /** It will set the given $value on the specific $key, inside the $object. Object is a PDO Statement */
-    public static function set(&$object, $key, $value)
+    public static function set(&$instance, $key, $value)
     {
-        $object->bindValue(":" . $key, $value);
+        $instance->bindValue(":" . $key, $value);
     }
 
     /** It executes any given $sql */
@@ -560,8 +552,8 @@ class db
         self::fixDataCollumns($data, $table, $newData);
         $array_keys = array_keys($newData);
         $sql = "INSERT INTO $table (" . implode(", ", $array_keys) . ") VALUES (:" . implode(", :", $array_keys) . ");";
-        $object = self::getInstance();
-        $stmnt = self::prepare($object, $sql);
+        $instance = self::getInstance();
+        $stmnt = self::prepare($instance, $sql);
         if (!empty($additional)) {
             self::transformWith($newData, $additional);
         }
@@ -570,8 +562,8 @@ class db
         }
         if ($stmnt->execute()) {
             self::updateTotalRequests();
-            self::$id = $object->lastInsertId();
-            unset($stmnt, $object);
+            self::$id = $instance->lastInsertId();
+            unset($stmnt, $instance);
             return true;
         } else {
             return false;
@@ -599,8 +591,8 @@ class db
             };
         }
         $sql = "UPDATE $table SET " . implode(", ", $collumns) . (!empty($rules) ? " WHERE " . implode(" AND ", $newRules) : "") . ";";
-        $object = self::getInstance();
-        $stmnt = self::prepare($object, $sql);
+        $instance = self::getInstance();
+        $stmnt = self::prepare($instance, $sql);
         if (!empty($additional)) {
             self::transformWith($newData, $additional);
         }
@@ -630,8 +622,8 @@ class db
             };
         }
         $sql = "DELETE FROM $table " . (empty($newRules) ? "" : "WHERE " . implode(" AND ", $newRules)) . ";";
-        $object = self::getInstance();
-        $stmnt = self::prepare($object, $sql);
+        $instance = self::getInstance();
+        $stmnt = self::prepare($instance, $sql);
         if (!empty($rules)) {
             foreach ($rules as $key => $value) {
                 self::set($stmnt, "rule_" . $key, $value);
@@ -696,7 +688,7 @@ class db
     }
 
     /** It will normalize a string to be accepted on URL addresses */
-    public function URLNormalize($string)
+    public static function URLNormalize($string)
     {
         $string = preg_replace('/[áàãâä]/ui', 'a', $string);
         $string = preg_replace('/[éèêë]/ui', 'e', $string);
@@ -716,15 +708,20 @@ class dbObject
     /** It is the DB instance */
     protected static $instance = null;
 
+    private $data = array();
+
     /** Array with extra info */
-    public $extra = null;
+    public $extra = array();
 
     /** It already sets a number of info on $extra */
     public function __construct($instance, $extra = array())
     {
         $this->setInstance($instance);
         $this->extra = $extra;
+        $this->extra['rows'] = -1;
         $this->extra['totalEntries'] = $instance->rowCount();
+        $this->extra['query'] = $instance->queryString;
+        $this->data = $instance->fetchAll(PDO::FETCH_ASSOC);
         return $this;
     }
 
@@ -738,5 +735,15 @@ class dbObject
     public static function getInstance()
     {
         return self::$instance;
+    }
+
+    /** Returns current data */
+    public function getData($all = false)
+    {
+        if ($all) {
+            return $this->data;
+        }
+        $this->extra["rows"]++;
+        return isset($this->data[$this->extra["rows"]]) ? $this->data[$this->extra["rows"]] : false;
     }
 }
