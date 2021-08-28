@@ -198,6 +198,9 @@ class db
         if ($query instanceof dbObject) {
             return ($query->getInstance()->rowCount() == 1);
         }
+        if(is_bool($query)){
+            return !$query;
+        }
     }
 
     /** Simple query */
