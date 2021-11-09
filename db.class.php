@@ -73,13 +73,14 @@ class db
             self::useConnection($connectionName);
         }
         try {
-            $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";charset=utf8;", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
+            $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
             if ($instance) {
                 $instance->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
                 //$connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 self::updateTotalRequests();
                 return $instance;
             } else {
+                exit("There's been an error within the database");
                 return false;
             }
         } catch (Exception $exception) {
@@ -186,7 +187,15 @@ class db
     /** It counts the total rows that $mixed have */
     public static function count($mixed)
     {
-        return self::encapsulate($mixed)->extra['totalEntries'];
+        if ($mixed == null) {
+            return 0;
+        } else {
+            if (is_array($mixed)) {
+                return 1;
+            } else {
+                return self::encapsulate($mixed)->extra['totalEntries'];
+            }
+        }
     }
 
     /** Checks if the given $query returns null. If it returns null or 0, the function return true (is empty) */
@@ -198,7 +207,7 @@ class db
         if ($query instanceof dbObject) {
             return ($query->getInstance()->rowCount() == 1);
         }
-        if(is_bool($query)){
+        if (is_bool($query)) {
             return !$query;
         }
     }
