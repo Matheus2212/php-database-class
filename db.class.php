@@ -137,9 +137,9 @@ class db
                 $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key));
                 self::$object[$key] = $instance;
             }
-            if (self::$object[$key]->extra["rows"] === self::$object[$key]->extra["totalEntries"]) {
+            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] || self::$object[$key]->extra["rows"] + 1 >= self::$object[$key]->extra["totalEntries"]) {
                 unset(self::$object[$key]);
-                return false;
+                return self::encapsulate($mixed);
             }
             return self::$object[$key];
         }
@@ -162,7 +162,8 @@ class db
                 }
             }
             $mixed = self::encapsulate($mixed);
-            return ($mixed ? $mixed->getData() : $mixed);
+            return $mixed->getData();
+            //return ($mixed ? $mixed->getData() : $mixed);
         }
         if ($mixed instanceof dbObject) {
             return $mixed->getData();
