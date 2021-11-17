@@ -7,6 +7,7 @@
  * 2021-03-12 -> Added a lot of comments
  * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage. Added search method.
  * 2021-08-17 -> Made a few improvements within base core functions
+ * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  */
 
 class db
@@ -137,7 +138,7 @@ class db
                 $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key));
                 self::$object[$key] = $instance;
             }
-            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] || self::$object[$key]->extra["rows"] + 1 >= self::$object[$key]->extra["totalEntries"]) {
+            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] !== 0) {
                 unset(self::$object[$key]);
                 return self::encapsulate($mixed);
             }
