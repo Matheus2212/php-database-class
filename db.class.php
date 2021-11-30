@@ -7,6 +7,7 @@
  * 2021-03-12 -> Added a lot of comments
  * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage. Added search method.
  * 2021-08-17 -> Made a few improvements within base core functions
+ * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  */
 
 class db
@@ -137,9 +138,9 @@ class db
                 $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key));
                 self::$object[$key] = $instance;
             }
-            if (self::$object[$key]->extra["rows"] === self::$object[$key]->extra["totalEntries"]) {
+            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] !== 0) {
                 unset(self::$object[$key]);
-                return false;
+                return self::encapsulate($mixed);
             }
             return self::$object[$key];
         }
@@ -162,7 +163,8 @@ class db
                 }
             }
             $mixed = self::encapsulate($mixed);
-            return ($mixed ? $mixed->getData() : $mixed);
+            return $mixed->getData();
+            //return ($mixed ? $mixed->getData() : $mixed);
         }
         if ($mixed instanceof dbObject) {
             return $mixed->getData();
@@ -205,7 +207,7 @@ class db
             return (self::query($query)->getInstance()->rowCount() == 0);
         }
         if ($query instanceof dbObject) {
-            return ($query->getInstance()->rowCount() == 1);
+            return ($query->getInstance()->rowCount() == 0);
         }
         if (is_bool($query)) {
             return !$query;
@@ -578,6 +580,8 @@ class db
             unset($stmnt, $instance);
             return true;
         } else {
+            echo "\nPDO::errorInfo():\n";
+            print_r($stmnt->errorInfo());
             return false;
         }
     }
