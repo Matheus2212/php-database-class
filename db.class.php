@@ -8,6 +8,7 @@
  * 2021-06-05 -> Added transformWith private method for insert and update methods using the $additional array. Added formatMonney public method to work with monetary values. Changed getPageNow to getCurrentPage. Added search method.
  * 2021-08-17 -> Made a few improvements within base core functions
  * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
+ * 2022-01-22 -> Fixed Fetch method when same SQL is called in a simple way. Also added a way to RETRIEVE data if same SQL is sent again
  */
 
 class db
@@ -130,17 +131,17 @@ class db
     }
 
     /** Creates a new DB Object with the given PDO instance */
-    private static function encapsulate($mixed)
+    private static function encapsulate($mixed, $simple = false)
     {
         if (is_string($mixed)) {
             $key = md5($mixed);
             if (!array_key_exists($key, self::$object)) {
-                $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key));
+                $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key, "simple" => $simple));
                 self::$object[$key] = $instance;
             }
-            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] !== 0) {
+            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] <= 0) {
                 unset(self::$object[$key]);
-                return self::encapsulate($mixed);
+                return false;
             }
             return self::$object[$key];
         }
@@ -162,8 +163,8 @@ class db
                     $mixed .= " LIMIT 1";
                 }
             }
-            $mixed = self::encapsulate($mixed);
-            return $mixed->getData();
+            $mixed = self::encapsulate($mixed, $simple);
+            return is_bool($mixed) ? $mixed : $mixed->getData();
             //return ($mixed ? $mixed->getData() : $mixed);
         }
         if ($mixed instanceof dbObject) {
@@ -203,14 +204,19 @@ class db
     /** Checks if the given $query returns null. If it returns null or 0, the function return true (is empty) */
     public static function empty($query)
     {
+        if (is_bool($query)) {
+            return !$query;
+        }
         if (is_string($query)) {
-            return (self::query($query)->getInstance()->rowCount() == 0);
+            $query = self::query($query);
+            if (is_bool($query)) {
+                return !$query;
+            } else {
+                return ($query->getInstance()->rowCount() == 0);
+            }
         }
         if ($query instanceof dbObject) {
             return ($query->getInstance()->rowCount() == 0);
-        }
-        if (is_bool($query)) {
-            return !$query;
         }
     }
 
@@ -615,6 +621,7 @@ class db
         foreach ($newData as $key => $value) {
             self::set($stmnt, $key, $value);
         }
+
         if (!empty($rules)) {
             foreach ($rules as $key => $value) {
                 self::set($stmnt, "rule_" . $key, $value);
@@ -737,7 +744,9 @@ class dbObject
         $this->extra['rows'] = -1;
         $this->extra['totalEntries'] = $instance->rowCount();
         $this->extra['query'] = $instance->queryString;
-        $this->data = $instance->fetchAll(PDO::FETCH_ASSOC);
+        if ($extra['simple']) {
+            $this->data = $instance->fetchAll(PDO::FETCH_ASSOC);
+        }
         return $this;
     }
 
@@ -757,9 +766,14 @@ class dbObject
     public function getData($all = false)
     {
         if ($all) {
-            return $this->data;
+            return $this->getInstance()->fetchAll(PDO::FETCH_ASSOC);
         }
-        $this->extra["rows"]++;
-        return isset($this->data[$this->extra["rows"]]) ? $this->data[$this->extra["rows"]] : false;
+        if (!$this->extra['simple']) {
+            $this->extra["rows"]++;
+            $data = $this->getInstance()->fetch(PDO::FETCH_ASSOC);
+            return $data;
+        } else {
+            return $this->data[0];
+        }
     }
 }
