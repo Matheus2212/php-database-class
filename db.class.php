@@ -9,6 +9,7 @@
  * 2021-08-17 -> Made a few improvements within base core functions
  * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  * 2022-01-22 -> Fixed Fetch method when same SQL is called in a simple way. Also added a way to RETRIEVE data if same SQL is sent again
+ * 2022-01-24 -> Fetch method is getting more complicated to solve. Third time in a row. 
  */
 
 class db
@@ -139,10 +140,14 @@ class db
                 $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key, "simple" => $simple));
                 self::$object[$key] = $instance;
             }
-            if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] <= 0) {
+            if (self::$object[$key] == "unsetted") {
                 unset(self::$object[$key]);
                 return false;
             }
+            /*if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] <= 0) {
+                unset(self::$object[$key]);
+                return false;
+            }*/
             return self::$object[$key];
         }
         if ($mixed instanceof dbObject) {
@@ -185,6 +190,12 @@ class db
         if ($mixed instanceof PDOStatement) {
             return $mixed->fetchAll(PDO::FETCH_ASSOC);
         }
+    }
+
+    public static function unsetObject($object)
+    {
+        self::$object[$object->extra['key']] = "unsetted";
+        unset(self::$object[$object->extra['key']]);
     }
 
     /** It counts the total rows that $mixed have */
@@ -413,10 +424,11 @@ class db
                     $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='next'", $url . "?" . http_build_query($_GET), $words["next"], '', ''), $htmlButton);
                 }
             }
+            $return = str_replace(array("{additional}", "{buttons}"), array($words['class'], implode("", $buttons)), $htmlWrapper);
             if ($echo) {
-                echo str_replace(array("{additional}", "{buttons}"), array($words['class'], implode("", $buttons)), $htmlWrapper);
+                echo $return;
             } else {
-                return true;
+                return $return;
             }
         }
     }
@@ -470,7 +482,7 @@ class db
     /** It will retrieve the collumns of the given $table */
     private static function getTableCollumns($table)
     {
-        return self::fetchAll(self::query("DESCRIBE $table"));
+        return self::fetchAll("DESCRIBE $table;");
     }
 
     /** It will fix invalid $data keys before insert them on the $table. It removes not used keys inside $data, and bind a empty string if a specific $key that exists on the table, doesn't exist on $data */
@@ -766,13 +778,21 @@ class dbObject
     public function getData($all = false)
     {
         if ($all) {
-            return $this->getInstance()->fetchAll(PDO::FETCH_ASSOC);
+            $data = $this->getInstance()->fetchAll(PDO::FETCH_ASSOC);
+            db::unsetObject($this);
+            return $data;
         }
         if (!$this->extra['simple']) {
             $this->extra["rows"]++;
             $data = $this->getInstance()->fetch(PDO::FETCH_ASSOC);
+            if ($this->extra['rows'] == $this->extra['totalEntries']) {
+                db::unsetObject($this);
+            }
             return $data;
         } else {
+            if (empty($this->data)) {
+                return false;
+            }
             return $this->data[0];
         }
     }
