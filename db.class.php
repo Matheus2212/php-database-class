@@ -9,7 +9,6 @@
  * 2021-08-17 -> Made a few improvements within base core functions
  * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  * 2022-01-22 -> Fixed Fetch method when same SQL is called in a simple way. Also added a way to RETRIEVE data if same SQL is sent again
- * 2022-01-24 -> Fetch method is getting more complicated to solve. Third time in a row. 
  */
 
 class db
@@ -316,8 +315,8 @@ class db
         $words = $object->extra['words'];
         $pageNow = 1;
         if (self::$friendlyURL !== false) {
-            if (self::$friendlyURL->contem($words['url'])) {
-                foreach (self::$friendlyURL->getPartes() as $part) {
+            if (self::$friendlyURL->has($words['url'])) {
+                foreach (self::$friendlyURL->getParts() as $part) {
                     if (preg_match("/$words[url]/", $part)) {
                         $aux = explode('-', $part);
                         if (isset($aux[1])) {
@@ -358,7 +357,7 @@ class db
             }
             if (self::$friendlyURL !== false) {
                 $url = $_SERVER['REQUEST_SCHEME'] . "://" . self::$friendlyURL->getSite();
-                $parts = self::$friendlyURL->getPartes();
+                $parts = self::$friendlyURL->getParts();
                 $keyPart = null;
                 foreach ($parts as $key => $part) {
                     if (preg_match("/$words[url]/", $part)) {
@@ -377,7 +376,7 @@ class db
             $buttons = array();
             if ($pageNow > 1) {
                 if (self::$friendlyURL) {
-                    $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow - 1);
+                    $parts[$keyPart] = self::$friendlyURL->makeLink($words['url'], $pageNow - 1);
                     $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='prev'", $url . "/" . implode("/", $parts), $words["prev"], '', ''), $htmlButton);
                 } else {
                     $_GET[$words['url']] = $pageNow - 1;
@@ -389,7 +388,7 @@ class db
                 $pageCount++;
                 if ($pageCount == $pageNow) {
                     if (self::$friendlyURL) {
-                        $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow);
+                        $parts[$keyPart] = self::$friendlyURL->makeLink($words['url'], $pageNow);
                     } else {
                         $_GET[$words['url']] = $pageNow;
                     }
@@ -397,7 +396,7 @@ class db
                 } else {
                     if ($pageCount <= $pageNow && ($pageCount >= $pageNow - 4 && ($pageNow == $totalPages || $pageNow + 1 == $totalPages || $pageNow + 2 == $totalPages) || ($pageCount >= $pageNow - 2)) && $pageCount > 0 && count($buttons) < 5 && ($pageCount == $pageNow - 1 || $pageCount == $pageNow - 2 || count($buttons) <= 5)) {
                         if (self::$friendlyURL) {
-                            $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageCount);
+                            $parts[$keyPart] = self::$friendlyURL->makeLink($words['url'], $pageCount);
                             $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
                         } else {
                             $_GET[$words['url']] = $pageCount;
@@ -406,7 +405,7 @@ class db
                     }
                     if ($pageCount >= $pageNow && $pageCount <= $totalPages && count($buttons) <= 5 && ($pageCount == $pageNow + 1 || $pageCount == $pageNow + 2 ||  count($buttons) <= 5)) {
                         if (self::$friendlyURL) {
-                            $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageCount);
+                            $parts[$keyPart] = self::$friendlyURL->makeLink($words['url'], $pageCount);
                             $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("", $url . "/" . implode("/", $parts), $pageCount, '', ''), $htmlButton);
                         } else {
                             $_GET[$words['url']] = $pageCount;
@@ -417,7 +416,7 @@ class db
             }
             if ($pageNow < $totalPages) {
                 if (self::$friendlyURL) {
-                    $parts[$keyPart] = self::$friendlyURL->gerarLink($words['url'], $pageNow + 1);
+                    $parts[$keyPart] = self::$friendlyURL->makeLink($words['url'], $pageNow + 1);
                     $buttons[] = str_replace(array("{rel}", "{target}", '{text|number}', '{active}', '{disabled}'), array("rel='next'", $url . "/" . implode("/", $parts), $words["next"], '', ''), $htmlButton);
                 } else {
                     $_GET[$words['url']] = $pageNow + 1;
