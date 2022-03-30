@@ -9,10 +9,14 @@
  * 2021-08-17 -> Made a few improvements within base core functions
  * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  * 2022-01-22 -> Fixed Fetch method when same SQL is called in a simple way. Also added a way to RETRIEVE data if same SQL is sent again
+ * 2022-03-30 -> Made some refactor in try/catch methods. Changed explanations to methods
  */
 
 class db
 {
+    /** This will define if errors will be displayed */
+    private $debug = false;
+
     /** This stores the current $connectionName */
     protected static $connectionName = null;
 
@@ -56,7 +60,9 @@ class db
         )
     );
 
-    /** Will return a database instance. It also sets manny vars about the connection, if isn't yet defined */
+    /**
+     * @return object $instance Returns the database instance
+     */
     private static function getInstance()
     {
         if (self::$dbInit == null) {
@@ -85,13 +91,17 @@ class db
                 exit("There's been an error within the database");
                 return false;
             }
-        } catch (Exception $exception) {
-            echo $exception;
+        } catch (Error $e) {
+            throw "Unable to connect to database: " . $e;
             exit();
         }
     }
 
-    /** Adds a database connection */
+    /**
+     * @param string $connectionName This is the connection name. Useful when needed to use more than one connection in application
+     * @param array $connectionCredentials Array containing all connection details
+     * @return object Return class itself
+     */
     public static function addConnection($connectionName, $connectionCredentials)
     {
         if (!array_key_exists($connectionName, self::$connections)) {
@@ -100,16 +110,30 @@ class db
         }
     }
 
-    /** Defines which connection the class will use */
+    /**
+     * @param $connectionName Defines which connection will use
+     * @return object|bool Return class itself or false
+     */
     public static function useConnection($connectionName)
     {
         if (array_key_exists($connectionName, self::$connections)) {
             self::$connectionName = $connectionName;
             return new static(new stdClass);
         }
+        return false;
     }
 
-    /** Sets total amount of requests to +1 */
+    /**
+     * @return string Return current used connection
+     */
+    public static function getConnectionName()
+    {
+        return self::$connectionName;
+    }
+
+    /**
+     * @void This will update the total amount of requests your application made
+     */
     private static function updateTotalRequests()
     {
         if (!isset(self::$connections[self::$connectionName]['totalRequests'])) {
@@ -118,19 +142,27 @@ class db
         self::$connections[self::$connectionName]['totalRequests']++;
     }
 
-    /** Returns the total amount of requests that the class did so far */
+    /**
+     * @return int $totalRequests Returns total amount of requests made
+     */
     public static function getTotalRequests()
     {
         return (isset(self::$connections[self::$connectionName]['totalRequests']) ? self::$connections[self::$connectionName]['totalRequests'] : 0);
     }
 
-    /** Checks the server speed */
+    /**
+     * @void Echos an HTML comment in page to see time ellapsed to do everything
+     */
     public static function performance()
     {
         echo "<!-- Time ellapsed: " . ((int) microtime() - (int) self::$dbInit) . " -->";
     }
 
-    /** Creates a new DB Object with the given PDO instance */
+    /**
+     * @param string|object Source to fetch data from database
+     * @param bool Defines if you'll get only one row, or if it's a collection
+     * @return object Returns DB Object instance
+     */
     private static function encapsulate($mixed, $simple = false)
     {
         if (is_string($mixed)) {
@@ -158,7 +190,11 @@ class db
         }
     }
 
-    /** Returns a single row */
+    /**
+     * @param string|object Data source to fetch data from
+     * @param bool Defines if it's only one row or a collection
+     * @return array Returns single row fetched
+     */
     public static function fetch($mixed, $simple = false)
     {
         if (is_string($mixed)) {
@@ -179,7 +215,10 @@ class db
         }
     }
 
-    /** Returns all fetched data */
+    /**
+     * @param string|object Data source to fetch all data
+     * @return array Returns an array with all rows fetched
+     */
     public static function fetchAll($mixed)
     {
         $mixed = self::encapsulate($mixed);
@@ -191,13 +230,19 @@ class db
         }
     }
 
+    /**
+     * @param object DB Object to be unsetted from the class
+     */
     public static function unsetObject($object)
     {
         self::$object[$object->extra['key']] = "unsetted";
         unset(self::$object[$object->extra['key']]);
     }
 
-    /** It counts the total rows that $mixed have */
+    /**
+     * @param array|object|string Data source to count rows
+     * @param int Returns total rows number
+     */
     public static function count($mixed)
     {
         if ($mixed == null) {
@@ -211,7 +256,10 @@ class db
         }
     }
 
-    /** Checks if the given $query returns null. If it returns null or 0, the function return true (is empty) */
+    /**
+     * @param string|bool|object Data source fetched to see if it's empty
+     * @return bool Returns the inverse of the bool generated
+     */
     public static function empty($query)
     {
         if (is_bool($query)) {
@@ -230,13 +278,21 @@ class db
         }
     }
 
-    /** Simple query */
+    /**
+     * @param string|object Data source to pull data from
+     * @return object Returns DB instance
+     */
     public static function query($mixed)
     {
         return self::encapsulate($mixed);
     }
 
-    /** This is a paged query */
+    /**
+     * @param string|object Quey string or object to pull data from
+     * @param int Number of rows to get for each page
+     * @param int Page number 
+     * @return object Returns the DB Object instance with pagination setted
+     */
     public static function pagedQuery($mixed, $limit, $page = false, $words = false)
     {
         if (is_string($mixed)) {
@@ -279,14 +335,20 @@ class db
         }
     }
 
-    /** It sets the class $language */
+    /**
+     * @param string Set class language. Default is en
+     * @return object Return self
+     */
     public static function setLanguage($language)
     {
         self::$language = $language;
         return new static(new stdClass);
     }
 
-    /** It defines the words that the pagination HTML will have */
+    /**
+     * @param object Receives DB Object instance
+     * @param array Receives which words to use on pagination URL
+     */
     public static function setPaginationWords($object, $words = false)
     {
         try {
@@ -298,15 +360,18 @@ class db
             }
             self::$pageObject = $object;
             self::$pageObject->extra['words'] = $words;
-        } catch (Exception $error) {
-            echo '$object must be a instance of dbObject<br/>';
-            echo '$words must have keys: url, prev, next<br/>';
-            echo $error;
+        } catch (Error $e) {
+            throw '$object must be a instance of dbObject.';
+            throw '$words must have keys: url, prev, next.';
+            throw $e;
             return false;
         }
     }
 
-    /** It retrieves the current page */
+    /**
+     * @param object|bool Receives or not, current object. The class will try to get it automatically
+     * @return int Current Page number
+     */
     private static function getCurrentPage($object = false)
     {
         if (!$object) {
@@ -338,7 +403,11 @@ class db
         return $pageNow;
     }
 
-    /** It creates the pagination HTML */
+    /**
+     * @param bool Defines if the HTML will be output or not
+     * @param string Defines which classes will be attached on pagination <li>s
+     * @return string Returns generated HTML to page
+     */
     public static function page($echo = true, $class = "")
     {
         $totalRows = self::$pageObject->extra['totalEntries'];
@@ -432,19 +501,29 @@ class db
         }
     }
 
-    /** Returns server date */
+    /**
+     * @param string|bool Receives which time to be setted
+     * @return string Returns server current date
+     */
     public static function date($time = false)
     {
         return ($time ? date("Y-m-d", $time) : date("Y-m-d"));
     }
 
-    /** Returns server dateTime */
+    /**
+     * @param string|bool Receives which datetime to be setted
+     * @return string Returns server current datetime
+     */
     public static function dateTime($time = false)
     {
         return ($time ? date("Y-m-d H:s:i", $time) : date("Y-m-d H:s:i"));
     }
 
-    /** It will change the whole database $collation */
+    /**
+     * @param string Receives which collation will be used to switch tables from
+     * @param bool Defines if will display SQL queries
+     * @param bool Defines if will execute the query automatically
+     */
     public static function setCollation($collation, $show = false, $execute = false)
     {
         $db_nome = self::$connections[self::$connectionName]['NAME'];
@@ -471,23 +550,38 @@ class db
         }
     }
 
-    /** Will define the $friendlyURL instance on the class */
+    /**
+     * @param class Receives FriendlyURL instance
+     * @return class Returns self
+     */
     public static function setFriendlyURL($FriendlyURLInstance)
     {
         self::$friendlyURL = $FriendlyURLInstance;
         return new static(new stdClass);
     }
 
-    /** It will retrieve the collumns of the given $table */
+    /**
+     * @param string Defines which table will be described
+     * @return array Returns data pulled from table schema
+     */
     private static function getTableCollumns($table)
     {
         return self::fetchAll("DESCRIBE $table;");
     }
 
-    /** It will fix invalid $data keys before insert them on the $table. It removes not used keys inside $data, and bind a empty string if a specific $key that exists on the table, doesn't exist on $data */
+    /**
+     * @param array Data array where the key is the collumn of the table
+     * @param string Table to compare keys and collumns
+     * @param array New array with new data to be setted
+     * @param string Defines if Data will be fixed to INSERT or to UPDATE - Class handles itself
+     * @return array Return new array with data matching all table collumns
+     */
     private static function fixDataCollumns($data, $table, &$newData = array(), $mode = "insert")
     {
         $collumns = self::getTableCollumns($table);
+        if (!$collumns) {
+            return false;
+        }
         foreach ($collumns as $collumn) {
             if ($collumn['Key'] == "PRI" && $collumn['Extra'] == "") {
                 $id = self::fetch(self::query("SELECT $collumn[Field] FROM $table ORDER BY $collumn[Field] DESC LIMIT 1"));
@@ -536,25 +630,39 @@ class db
         return $newData;
     }
 
-    /** It will prepare a given $sql to the given $object */
+    /**
+     * @param object Instance to prepare query
+     * @param string SQL to be prepared
+     * @return bool Returns bool if query got prepared or not
+     */
     public static function prepare($instance, $sql)
     {
         return $instance->prepare($sql);
     }
 
-    /** It will set the given $value on the specific $key, inside the $object. Object is a PDO Statement */
+    /**
+     * @param object Prepared query instance
+     * @param string Array key matching table collumn
+     * @param string Value for the cell, on current table row
+     */
     public static function set(&$instance, $key, $value)
     {
         $instance->bindValue(":" . $key, $value);
     }
 
-    /** It executes any given $sql */
+    /**
+     * @param string Query to be executed
+     * @return bool Returns if it failed or succeeded
+     */
     public static function execute($sql)
     {
         return self::getInstance()->exec($sql);
     }
 
-    /** It will apply the additional steps before the real method applyment */
+    /**
+     * @param array Data to be transformed
+     * @param array Additional array containing callback functions to apply to setted data keys
+     */
     private static function transformWith(&$data, $additional)
     {
         if (isset($additional['function'])) {
@@ -566,8 +674,11 @@ class db
         }
     }
 
-    /** This function is responsible to make the given value a decimal value for monetary operations */
     /** It looks like the best option to save monney on a database is to use the DECIMAL 19,4 */
+    /**
+     * @param string|int|float Monney value
+     * @return string|float Formatted value
+     */
     public static function formatMonney($value)
     {
         $source = array('.', ',');
@@ -577,10 +688,18 @@ class db
     }
 
 
-    /** It will insert $data on a specific $table. The $rules are optional */
+    /**
+     * @param array Data array to be inserted
+     * @param string Table to insert data
+     * @param array Additional array to use as callbacks for each data position
+     * @return bool Returns if data were inserted or not
+     */
     public static function insert($data, $table, $additional = array())
     {
         self::fixDataCollumns($data, $table, $newData);
+        if (!$newData) {
+            return false;
+        }
         $array_keys = array_keys($newData);
         $sql = "INSERT INTO $table (" . implode(", ", $array_keys) . ") VALUES (:" . implode(", :", $array_keys) . ");";
         $instance = self::getInstance();
@@ -591,25 +710,33 @@ class db
         foreach ($newData as $key => $value) {
             self::set($stmnt, $key, $value);
         }
-        if ($stmnt->execute()) {
+        try {
+            $stmnt->execute();
             self::updateTotalRequests();
             self::$id = $instance->lastInsertId();
             unset($stmnt, $instance);
             return true;
-        } else {
-            echo "\nPDO::errorInfo():\n";
-            print_r($stmnt->errorInfo());
+        } catch (Error $e) {
+            throw ("An error ocurred: " . $e);
             return false;
         }
     }
 
-    /** It will return the id of the last inserted row */
+    /**
+     * @return int Returns inserted row ID
+     */
     public static function id()
     {
         return self::$id;
     }
 
-    /** It will update a row on a specific $table with new $data. The row must attend to the $rules */
+    /**
+     * @param array Data array to be updated
+     * @param string Table to update data
+     * @param array Rules to define WHERE data will be updated
+     * @param array Additional array to use as callbacks for each data position
+     * @return bool Returns if data were updated or not
+     */
     public static function update($data, $table, $rules = array(), $additional = array())
     {
         self::fixDataCollumns($data, $table, $newData, "update");
@@ -638,15 +765,21 @@ class db
                 self::set($stmnt, "rule_" . $key, $value);
             }
         }
-        if ($stmnt->execute()) {
+        try {
+            $stmnt->execute();
             self::updateTotalRequests();
             return true;
-        } else {
+        } catch (Error $e) {
+            throw ("An error has occured: " . $e);
             return false;
         }
     }
 
-    /** It will delete a record - or all - on a specific $table */
+    /**
+     * @param string Which table will delete data
+     * @param array Rules to define WHERE data will be deleted
+     * @return bool Returns if data was or wasn't deleted
+     */
     public static function delete($table, $rules = array())
     {
         if (!empty($rules)) {
@@ -663,14 +796,18 @@ class db
                 self::set($stmnt, "rule_" . $key, $value);
             }
         }
-        if ($stmnt->execute()) {
-            return true;
-        } else {
+        try {
+            return $stmnt->execute();
+        } catch (Error $e) {
+            throw ("An error has occured: " . $e);
             return false;
         }
     }
 
-    /** Will return an array with all words inside the given input */
+    /**
+     * @param string Search term to get all words
+     * @return array Array containing all words and combinations with the given words
+     */
     private static function getAllWords($input)
     {
         $words = array_filter(explode(" ", $input), function ($word) {
@@ -707,7 +844,11 @@ class db
         return $allcombinations;
     }
 
-    /** It will search for the given input inside the given table and return all records found */
+    /**
+     * @param string Search term to find data
+     * @param string Table name to search data
+     * @return object Query instance with prepared SQL
+     */
     public static function search($what, $where)
     {
         $words = self::getAllWords($what);
@@ -718,10 +859,13 @@ class db
         $concat = "CONCAT(" . implode(", ", $collumns) . ")";
         $sql = "SELECT * FROM $where WHERE $concat LIKE ('%" . implode("%') OR $concat LIKE ('%", $words) . "%')";
         $query = self::query($sql);
-        return $query;;
+        return $query;
     }
 
-    /** It will normalize a string to be accepted on URL addresses */
+    /**
+     * @param string String to be transormed into URL acceptable
+     * @return string String accepted as URLs
+     */
     public static function URLNormalize($string)
     {
         $string = preg_replace('/[áàãâä]/ui', 'a', $string);
@@ -753,31 +897,38 @@ class dbObject
         $this->setInstance($instance);
         $this->extra = $extra;
         $this->extra['rows'] = -1;
-        $this->extra['totalEntries'] = $instance->rowCount();
-        $this->extra['query'] = $instance->queryString;
+        $this->extra['totalEntries'] = $instance ? $instance->rowCount() : 0;
+        $this->extra['query'] = $instance ? $instance->queryString : "";
         if ($extra['simple']) {
-            $this->data = $instance->fetchAll(PDO::FETCH_ASSOC);
+            $this->data = $instance ? $instance->fetchAll(PDO::FETCH_ASSOC) : array();
         }
         return $this;
     }
 
-    /** It will set the $instance */
+    /**
+     * @param object Set as reference to DB Class to work with
+     */
     private static function setInstance($instance)
     {
         self::$instance = $instance;
     }
 
-    /** It will retrieve the object's DB $instance */
+    /**
+     * @return object Returns DB Class intance reference
+     */
     public static function getInstance()
     {
         return self::$instance;
     }
 
-    /** Returns current data */
+    /**
+     * @param bool Defines if will returns all or a single row only
+     * @return array|bool Returns current DB Object Class data
+     */
     public function getData($all = false)
     {
         if ($all) {
-            $data = $this->getInstance()->fetchAll(PDO::FETCH_ASSOC);
+            $data = $this->getInstance() ? $this->getInstance()->fetchAll(PDO::FETCH_ASSOC) : false;
             db::unsetObject($this);
             return $data;
         }
