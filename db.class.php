@@ -10,13 +10,11 @@
  * 2021-11-16 -> Fixed Fetch method when same SQL is called more than once
  * 2022-01-22 -> Fixed Fetch method when same SQL is called in a simple way. Also added a way to RETRIEVE data if same SQL is sent again
  * 2022-03-30 -> Made some refactor in try/catch methods. Changed explanations to methods
+ * 2022-04-04 -> Turned DB Objet into non-static object. This way is much more easier to run multiple queries while fetching more data
  */
 
 class db
 {
-    /** This will define if errors will be displayed */
-    private $debug = false;
-
     /** This stores the current $connectionName */
     protected static $connectionName = null;
 
@@ -63,10 +61,13 @@ class db
     /**
      * @return object $instance Returns the database instance
      */
-    private static function getInstance()
+    private static function getInstance($key = false)
     {
         if (self::$dbInit == null) {
             self::$dbInit = microtime();
+        }
+        if ($key && isset(self::$object[$key])) {
+            return self::$object[$key]->getInstance();
         }
         if (is_null(self::$connectionName)) {
             global $DB_HOST, $DB_USER, $DB_PASSWORD, $DB_NAME;
@@ -84,7 +85,6 @@ class db
             $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
             if ($instance) {
                 $instance->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
-                //$connection->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 self::updateTotalRequests();
                 return $instance;
             } else {
@@ -175,10 +175,6 @@ class db
                 unset(self::$object[$key]);
                 return false;
             }
-            /*if (self::$object[$key]->extra["rows"] + 1 == self::$object[$key]->extra["totalEntries"] && self::$object[$key]->extra["totalEntries"] <= 0) {
-                unset(self::$object[$key]);
-                return false;
-            }*/
             return self::$object[$key];
         }
         if ($mixed instanceof dbObject) {
@@ -205,7 +201,6 @@ class db
             }
             $mixed = self::encapsulate($mixed, $simple);
             return is_bool($mixed) ? $mixed : $mixed->getData();
-            //return ($mixed ? $mixed->getData() : $mixed);
         }
         if ($mixed instanceof dbObject) {
             return $mixed->getData();
@@ -647,7 +642,7 @@ class db
      */
     public static function set(&$instance, $key, $value)
     {
-        $instance->bindValue(":" . $key, $value);
+        $instance->bindValue(":" . $key, is_array($value) ? json_encode($value) : $value);
     }
 
     /**
@@ -711,11 +706,14 @@ class db
             self::set($stmnt, $key, $value);
         }
         try {
-            $stmnt->execute();
-            self::updateTotalRequests();
-            self::$id = $instance->lastInsertId();
-            unset($stmnt, $instance);
-            return true;
+            if (is_object($stmnt)) {
+                $stmnt->execute();
+                self::updateTotalRequests();
+                self::$id = $instance->lastInsertId();
+                unset($stmnt, $instance);
+                return true;
+            }
+            return false;
         } catch (Error $e) {
             throw ("An error ocurred: " . $e);
             return false;
@@ -766,9 +764,12 @@ class db
             }
         }
         try {
-            $stmnt->execute();
-            self::updateTotalRequests();
-            return true;
+            if (is_object($stmnt)) {
+                $stmnt->execute();
+                self::updateTotalRequests();
+                return true;
+            }
+            return false;
         } catch (Error $e) {
             throw ("An error has occured: " . $e);
             return false;
@@ -797,7 +798,10 @@ class db
             }
         }
         try {
-            return $stmnt->execute();
+            if (is_object($stmnt)) {
+                return $stmnt->execute();
+            }
+            return false;
         } catch (Error $e) {
             throw ("An error has occured: " . $e);
             return false;
@@ -884,7 +888,7 @@ class db
 class dbObject
 {
     /** It is the DB instance */
-    protected static $instance = null;
+    protected $instance = null;
 
     private $data = array();
 
@@ -908,17 +912,17 @@ class dbObject
     /**
      * @param object Set as reference to DB Class to work with
      */
-    private static function setInstance($instance)
+    private function setInstance($instance)
     {
-        self::$instance = $instance;
+        $this->instance = $instance;
     }
 
     /**
      * @return object Returns DB Class intance reference
      */
-    public static function getInstance()
+    public function getInstance()
     {
-        return self::$instance;
+        return $this->instance;
     }
 
     /**
