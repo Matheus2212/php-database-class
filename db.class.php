@@ -85,6 +85,7 @@ class db
             $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
             if ($instance) {
                 $instance->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
+                $instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 self::updateTotalRequests();
                 return $instance;
             } else {
@@ -269,6 +270,9 @@ class db
             }
         }
         if ($query instanceof dbObject) {
+            if (is_bool($query->getInstance())) {
+                return true;
+            }
             return ($query->getInstance()->rowCount() == 0);
         }
     }
@@ -580,7 +584,7 @@ class db
         foreach ($collumns as $collumn) {
             if ($collumn['Key'] == "PRI" && $collumn['Extra'] == "") {
                 $id = self::fetch(self::query("SELECT $collumn[Field] FROM $table ORDER BY $collumn[Field] DESC LIMIT 1"));
-                $newData[$collumn['Field']] = ++$id['id'];
+                $newData[$collumn['Field']] = ++$id[$collumn['Field']];
             } else if ($collumn['Key'] == "PRI" && $collumn['Extra'] !== "") {
                 unset($newData[$collumn['Field']]);
             }
@@ -593,25 +597,22 @@ class db
                 } else {
                     if (preg_match("/int/", $collumn['Type']) && !isset($newData[$collumn['Field']]) && $collumn['Extra'] == "") {
                         $newData[$collumn['Field']] = 0;
-                    }
-                    if (preg_match("/char|text/", $collumn['Type'])) {
+                    } else if (preg_match("/char|text/", $collumn['Type'])) {
                         $newData[$collumn['Field']] = "";
-                    }
-                    if (preg_match("/date|time|year/", $collumn['Type'])) {
+                    } else if (preg_match("/date|time|year/", $collumn['Type'])) {
                         if ($collumn['Type'] == "datetime") {
-                            $newData[$collumn['Field']] = "0000-00-00 00:00:00";
-                        }
+                            $newData[$collumn['Field']] = self::dateTime();
+                        } else 
                         if ($collumn['Type'] == "date") {
-                            $newData[$collumn['Field']] = "0000-00-00";
-                        }
+                            $newData[$collumn['Field']] = self::date();
+                        } else 
                         if ($collumn['Type'] == "year") {
-                            $newData[$collumn['Field']] = "0000";
-                        }
+                            $newData[$collumn['Field']] = self::date("Y");
+                        } else
                         if ($collumn['Type'] == "timestamp") {
                             $newData[$collumn['Field']] = time();
                         }
-                    }
-                    if (preg_match('/enum|set/', $collumn['Type'])) {
+                    } else if (preg_match('/enum|set/', $collumn['Type'])) {
                         preg_match("/(?:[set|enum])(?:\()(.*?)(?:\))/", $collumn['Type'], $matches);
                         $values = explode(",", $matches[1]);
                         $value = substr($values[0], 1);
@@ -710,12 +711,11 @@ class db
                 $stmnt->execute();
                 self::updateTotalRequests();
                 self::$id = $instance->lastInsertId();
-                unset($stmnt, $instance);
-                return true;
+                return (self::$id != 0);
             }
             return false;
         } catch (Error $e) {
-            throw ("An error ocurred: " . $e);
+            throw ($e);
             return false;
         }
     }
@@ -757,7 +757,6 @@ class db
         foreach ($newData as $key => $value) {
             self::set($stmnt, $key, $value);
         }
-
         if (!empty($rules)) {
             foreach ($rules as $key => $value) {
                 self::set($stmnt, "rule_" . $key, $value);
@@ -809,6 +808,7 @@ class db
     }
 
     /**
+     *  TODO
      * @param string Search term to get all words
      * @return array Array containing all words and combinations with the given words
      */
