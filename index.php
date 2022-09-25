@@ -3,7 +3,7 @@
 // needs a BIG refactor
 
 
-include("db.class.php");
+include("DbClass.php");
 
 db::addConnection('default', array("HOST" => "localhost", "USER" => "root", "PASSWORD" => "", "NAME" => "test"));
 
