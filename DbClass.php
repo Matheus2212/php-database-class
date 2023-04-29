@@ -169,8 +169,12 @@ class db
         if (is_string($mixed)) {
             $key = md5($mixed);
             if (!array_key_exists($key, self::$object)) {
-                $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key, "simple" => $simple));
-                self::$object[$key] = $instance;
+                try {
+                    $instance = new dbObject(self::getInstance()->query($mixed), array("key" => $key, "simple" => $simple));
+                    self::$object[$key] = $instance;
+                } catch (Exception $e) {
+                    return false;
+                }
             }
             if (self::$object[$key] == "unsetted") {
                 unset(self::$object[$key]);
