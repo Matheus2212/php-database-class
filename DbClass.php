@@ -125,6 +125,15 @@ class db
     }
 
     /**
+     * @return object|bool Return class itself or false
+     */
+    public static function testConnection()
+    {
+        return self::getInstance();
+    }
+
+
+    /**
      * @return string Return current used connection
      */
     public static function getConnectionName()
