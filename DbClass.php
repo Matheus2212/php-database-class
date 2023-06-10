@@ -404,7 +404,11 @@ class db
                 }
             }
         } else {
-            $url = $_SERVER['REQUEST_SCHEME'] . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+            $request_scheme = "https";
+            if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] != 'on') {
+                $request_scheme = "http";
+            }
+            $url = $request_scheme . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
             if (preg_match("/\?{1,}/", $url)) {
                 $url = explode("?", $url)[0];
                 if (isset($_GET[$words['url']])) {
@@ -430,6 +434,10 @@ class db
             if (!isset(self::$pageObject->extra['words'])) {
                 self::setPaginationWords(self::$pageObject);
             }
+            $request_scheme = "https";
+            if (!isset($_SERVER['HTTPS']) || $_SERVER['HTTPS'] != 'on') {
+                $request_scheme = "http";
+            }
             $words = self::$pageObject->extra['words'];
             $totalPages = ceil($totalRows / $limit);
             $pageNow = self::getCurrentPage(self::$pageObject);
@@ -437,7 +445,7 @@ class db
                 $words['class'] . " " . $class . " ";
             }
             if (self::$friendlyURL !== false) {
-                $url = $_SERVER['REQUEST_SCHEME'] . "://" . self::$friendlyURL->getSite();
+                $url = $request_scheme . "://" . self::$friendlyURL->getSite();
                 $parts = self::$friendlyURL->getParts();
                 $keyPart = null;
                 foreach ($parts as $key => $part) {
@@ -447,7 +455,7 @@ class db
                     }
                 }
             } else {
-                $url = $_SERVER['REQUEST_SCHEME'] . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+                $url = $request_scheme . "://" . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
                 if (preg_match("/\?{1,}/", $url)) {
                     $url = explode("?", $url)[0];
                 }
