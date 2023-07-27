@@ -21,6 +21,9 @@ class db
     /** This array stores all $connections added so far on execution */
     protected static $connections = array();
 
+    /** This string stores current open connection */
+    private static $connection = "";
+
     /** This will receive the last inserted row $id */
     protected static $id = null;
 
@@ -82,11 +85,15 @@ class db
             self::useConnection($connectionName);
         }
         try {
+            if (self::$connection !== "") {
+                return self::$connection;
+            }
             $instance = new PDO('mysql:host=' . self::$connections[self::$connectionName]['HOST'] . ";dbname=" . self::$connections[self::$connectionName]['NAME'] . ";", self::$connections[self::$connectionName]['USER'], self::$connections[self::$connectionName]['PASSWORD']);
             if ($instance) {
                 $instance->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
                 $instance->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
                 self::updateTotalRequests();
+                self::$connection = $instance;
                 return $instance;
             } else {
                 exit("There's been an error within the database");
@@ -189,6 +196,7 @@ class db
                 unset(self::$object[$key]);
                 return false;
             }
+            //print_r(self::$object[$key]);
             return self::$object[$key];
         }
         if ($mixed instanceof dbObject) {
@@ -244,7 +252,7 @@ class db
      */
     public static function unsetObject($object)
     {
-        self::$object[$object->extra['key']] = "unsetted";
+        //self::$object[$object->extra['key']] = "unsetted";
         unset(self::$object[$object->extra['key']]);
     }
 
